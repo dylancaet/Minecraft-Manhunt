@@ -3,6 +3,8 @@ package aio.manhunt;
 import net.fabricmc.api.ModInitializer;
 
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
+import net.fabricmc.fabric.impl.gametest.FabricGameTestModInitializer;
+import net.fabricmc.fabric.impl.gametest.FabricGameTestRunner;
 import net.minecraft.server.MinecraftServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
