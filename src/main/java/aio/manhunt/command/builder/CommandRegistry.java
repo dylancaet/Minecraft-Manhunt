@@ -2,32 +2,27 @@ package aio.manhunt.command.builder;
 
 import aio.manhunt.Manhunt;
 import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.arguments.ArgumentType;
 import com.mojang.brigadier.arguments.BoolArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.ArgumentBuilder;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
-import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import io.github.classgraph.ClassGraph;
 import io.github.classgraph.ClassInfo;
-import lombok.Getter;
 import net.minecraft.command.CommandRegistryAccess;
-import net.minecraft.command.argument.ArgumentTypes;
 import net.minecraft.command.argument.EntityArgumentType;
 import net.minecraft.server.command.CommandManager;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.text.Text;
 
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Parameter;
-import java.util.ArrayList;
-import java.util.List;
 
-import static com.mojang.brigadier.builder.RequiredArgumentBuilder.argument;
+import static org.apache.commons.lang3.reflect.MethodUtils.invokeMethod;
 
 public class CommandRegistry
 {
@@ -64,7 +59,7 @@ public class CommandRegistry
                 throw new RuntimeException(String.format("Unable to create instance of %s", _class.getName()), e);
             }
 
-            LiteralArgumentBuilder<ServerCommandSource> subcommand = CommandManager.literal(meta.name());
+            LiteralArgumentBuilder<ServerCommandSource> classLiteral = CommandManager.literal(meta.name());
 
             for (Method method : _class.getDeclaredMethods())
             {
@@ -77,79 +72,70 @@ public class CommandRegistry
                 if (methodParams.length == 0 || methodParams[0].getType() != CommandContext.class)
                     continue;
 
-                LiteralArgumentBuilder<ServerCommandSource> subcommandMethod = CommandManager.literal(methodName);
+                LiteralArgumentBuilder<ServerCommandSource> methodLiteral = CommandManager.literal(methodName);
 
-                ArgumentBuilder<ServerCommandSource, ?> argBuilder;
-
-                if (methodParams.length > 1) {
-                    Parameter arg = methodParams[1];
-                    Class<?> argType = arg.getType();
-
-                    if (argType == ServerPlayerEntity.class) {
-                        argBuilder = argument(arg.getName(), EntityArgumentType.player());
-                    } else if (argType == String.class) {
-                        argBuilder = argument(arg.getName(), StringArgumentType.string());
-                    } else if (argType == Integer.class) {
-                        argBuilder = argument(arg.getName(), IntegerArgumentType.integer());
-                    } else if (argType == Boolean.class) {
-                        argBuilder = argument(arg.getName(), BoolArgumentType.bool());
-                    } else {
-                        throw new IllegalArgumentException("Unsupported parameter type: " + argType.getTypeName());
-                    }
-
-                    dispatcher.register(
-                            root.then(
-                                    subcommand.then(
-                                            subcommandMethod.then(
-                                                    argBuilder.executes(context -> {
-
-                                                        Object invokeArg;
-
-                                                        if (argType == ServerPlayerEntity.class) {
-                                                            invokeArg = EntityArgumentType.getPlayer(context, arg.getName());
-                                                        } else if (argType == Boolean.class) {
-                                                            invokeArg = BoolArgumentType.getBool(context, arg.getName());
-                                                        } else if (argType == Integer.class) {
-                                                            invokeArg = IntegerArgumentType.getInteger(context, arg.getName());
-                                                        } else {
-                                                            invokeArg = StringArgumentType.getString(context, arg.getName());
-                                                        }
-
-                                                        try {
-                                                            method.invoke(classInstance, context, invokeArg);
-                                                        } catch (Exception e) {
-                                                            throw new RuntimeException(e);
-                                                        }
-
-                                                        return 1;
-                                                    })
-                                            )
-                                    )
-                            )
-                    );
+                if (methodParams.length == 1) {
+                    methodLiteral.executes(context -> invokeCommandMethod(method, classInstance, context));
                 }
                 else {
-                    dispatcher.register(
-                            root.then(
-                                    subcommand.then(
-                                            subcommandMethod.executes(context -> {
-                                                try {
-                                                    method.invoke(classInstance, context);
-                                                } catch (Exception e) {
-                                                    throw new RuntimeException(e);
-                                                }
-
-                                                return 1;
-                                            })
-                                    )
-                            )
-                    );
+                    ArgumentBuilder<ServerCommandSource, ?> argBuilder = buildArgumentChain(methodParams, method, classInstance);
+                    methodLiteral.then(argBuilder);
                 }
 
+                classLiteral.then(methodLiteral);
             }
 
+            root.then(classLiteral);
         }
 
         scanResult.close();
+        dispatcher.register(root);
     }
+
+    private ArgumentBuilder<ServerCommandSource, ?> buildArgumentChain(Parameter[] params, Method method, Object instance)
+    {
+        Parameter arg = params[1];
+        String argName = arg.getName();
+        Class<?> type = arg.getType();
+
+        ArgumentBuilder<ServerCommandSource, ?> argBuilder = CommandManager.argument(argName, brigadierArgFor(type))
+                .executes(context -> {
+                    Object invokeArg = extractArgValue(context, type, argName);
+                    return invokeCommandMethod(method, instance, context, invokeArg);
+                });
+
+        return argBuilder;
+    }
+
+    private Object extractArgValue(CommandContext<ServerCommandSource> context, Class<?> type, String argName) throws CommandSyntaxException
+    {
+        if (type == ServerPlayerEntity.class) return EntityArgumentType.getPlayer(context, argName);
+        if (type == String.class) return StringArgumentType.getString(context, argName);
+        if (type == Integer.class || type == int.class) return IntegerArgumentType.getInteger(context, argName);
+        if (type == Boolean.class || type == boolean.class) return BoolArgumentType.getBool(context, argName);
+        throw new IllegalArgumentException("Unsupported parameter type: " + type.getName());
+    }
+
+    private ArgumentType<?> brigadierArgFor(Class<?> type)
+    {
+        if (type == ServerPlayerEntity.class) return EntityArgumentType.player();
+        if (type == String.class) return StringArgumentType.string();
+        if (type == Integer.class || type == int.class) return IntegerArgumentType.integer();
+        if (type == Boolean.class || type == boolean.class) return BoolArgumentType.bool();
+        throw new IllegalArgumentException("Unsupported parameter type: " + type.getName());
+    }
+
+    private int invokeCommandMethod(Method method, Object instance, CommandContext<ServerCommandSource> context, Object... args)
+    {
+        try {
+            Object[] invokeArgs = new Object[args.length + 1];
+            invokeArgs[0] = context;
+            System.arraycopy(args, 0, invokeArgs, 1, args.length);
+            method.invoke(instance, invokeArgs);
+            return 1;
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to invoke " + method.getName(), e);
+        }
+    }
+
 }

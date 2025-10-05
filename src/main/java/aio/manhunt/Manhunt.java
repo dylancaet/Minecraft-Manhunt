@@ -34,7 +34,6 @@ public class Manhunt implements ModInitializer
         ServerTickEvents.START_SERVER_TICK.register(this::OnServerTick);
 
         CommandRegistrationCallback.EVENT.register(CommandRegistry.getInstance()::build);
-
     }
 
     private void OnServerTick(MinecraftServer minecraftServer)
