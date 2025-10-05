@@ -13,10 +13,4 @@ public class ManhuntTest implements CustomTestMethodInvoker
     {
         method.invoke(this, context);
     }
-
-    @GameTest
-    public void test_one(TestContext context)
-    {
-    }
-
 }
