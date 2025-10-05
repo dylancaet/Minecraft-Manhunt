@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "id": "tests-manhunt",
+  "version": "1.0.0",
+  "name": "Test for manhunt",
+  "icon": "assets/fabric-docs-reference/icon.png",
+  "environment": "*",
+  "entrypoints": {
+    "fabric-gametest": [
+      "aio.manhunt.ManhuntTest"
+    ]
+  }
+}

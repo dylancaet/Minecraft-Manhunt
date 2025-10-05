@@ -3,7 +3,7 @@
 	"id": "manhunt",
 	"version": "${version}",
 	"name": "Manhunt",
-	"description": "All in one manhunt, for a streamline experience",
+	"description": "All in one manhunt, for a streamlined experience",
 	"authors": [
 		"defuJ"
 	],
@@ -18,7 +18,7 @@
 		"main": [
 			"aio.manhunt.Manhunt"
 		]
-	},
+    },
 	"mixins": [
 		"manhunt.mixins.json"
 	],
