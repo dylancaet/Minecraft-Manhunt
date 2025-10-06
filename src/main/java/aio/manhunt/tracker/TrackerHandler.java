@@ -15,13 +15,13 @@ public class TrackerHandler
 {
     private static TrackerHandler instance;
 
-    @Getter private HashMap<String, Tracker> playerTrackerMap;
+    @Getter private HashMap<String, PlayerTracker> playerTrackerMap;
     private Scoreboard scoreboard;
     private Team runners;
 
     public TrackerHandler()
     {
-        playerTrackerMap = new HashMap<String, Tracker>();
+        playerTrackerMap = new HashMap<String, PlayerTracker>();
         scoreboard = Manhunt.SERVER.getScoreboard();
         runners = Optional.ofNullable(scoreboard.getTeam("runners")).orElse(scoreboard.addTeam("runners")); /* i wish java had coalesce */
 
@@ -29,7 +29,6 @@ public class TrackerHandler
         runners.setShowFriendlyInvisibles(false);
         runners.setNameTagVisibilityRule(AbstractTeam.VisibilityRule.ALWAYS);
     }
-
 
     public static synchronized TrackerHandler getInstance()
     {
@@ -63,13 +62,16 @@ public class TrackerHandler
 
         if (value)
         {
-            playerTrackerMap.put(playerName, null);
+            playerTrackerMap.put(playerName, new PlayerTracker(player));
             scoreboard.addScoreHolderToTeam(playerName, runners);
-        } else
+        }
+        else
         {
-            playerTrackerMap.remove(playerName);
-            if (runners.getPlayerList().contains(playerName))
+            if (runners.getPlayerList().contains(playerName)) {
+                playerTrackerMap.get(playerName).dispose();
                 scoreboard.removeScoreHolderFromTeam(playerName, runners);
+                playerTrackerMap.remove(playerName);
+            }
         }
     }
 
