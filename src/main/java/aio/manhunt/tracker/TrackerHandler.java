@@ -23,11 +23,7 @@ public class TrackerHandler
     {
         playerTrackerMap = new HashMap<String, PlayerTracker>();
         scoreboard = Manhunt.SERVER.getScoreboard();
-        runners = Optional.ofNullable(scoreboard.getTeam("runners")).orElse(scoreboard.addTeam("runners")); /* i wish java had coalesce */
-
-        runners.setColor(Formatting.RED);
-        runners.setShowFriendlyInvisibles(false);
-        runners.setNameTagVisibilityRule(AbstractTeam.VisibilityRule.ALWAYS);
+        runners = createRunnersTeam();
     }
 
     public static synchronized TrackerHandler getInstance()
@@ -74,5 +70,21 @@ public class TrackerHandler
             }
         }
     }
+
+    private Team createRunnersTeam()
+    {
+        Team runners = scoreboard.getTeam("runners");
+
+        if (runners != null)
+            scoreboard.removeTeam(runners);
+
+        runners = scoreboard.addTeam("runners");
+        runners.setColor(Formatting.RED);
+        runners.setShowFriendlyInvisibles(false);
+        runners.setNameTagVisibilityRule(AbstractTeam.VisibilityRule.ALWAYS);
+
+        return runners;
+    }
+
 
 }
