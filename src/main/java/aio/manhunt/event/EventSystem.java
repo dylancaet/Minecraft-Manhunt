@@ -1,18 +1,14 @@
 package aio.manhunt.event;
 
-import aio.manhunt.tracker.TrackerHandler;
-
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class EventSystem
 {
     private static EventSystem instance;
 
-    private final Map<EventType, List<EventHandler<?>>> subscribers = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<EventType, List<EventHandler<?>>> subscribers = new ConcurrentHashMap<>();
 
     public static synchronized EventSystem getInstance()
     {

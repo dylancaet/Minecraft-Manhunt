@@ -1,15 +1,24 @@
 package aio.manhunt.tracker;
 
 import aio.manhunt.Manhunt;
+import aio.manhunt.event.EventHandler;
+import aio.manhunt.event.EventType;
 import lombok.Getter;
+import net.minecraft.registry.RegistryKey;
 import net.minecraft.scoreboard.AbstractTeam;
 import net.minecraft.scoreboard.Scoreboard;
 import net.minecraft.scoreboard.Team;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
+import net.minecraft.world.World;
+import org.apache.logging.log4j.core.jmx.Server;
 
+import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.Optional;
+import java.util.List;
+import java.util.stream.Collectors;
 
 public class TrackerHandler
 {
@@ -19,11 +28,15 @@ public class TrackerHandler
     private Scoreboard scoreboard;
     private Team runners;
 
+    private final EventHandler<MinecraftServer> onTickHandle = this::onTick;
+
     public TrackerHandler()
     {
         playerTrackerMap = new HashMap<String, PlayerTracker>();
         scoreboard = Manhunt.SERVER.getScoreboard();
         runners = createRunnersTeam();
+
+        Manhunt.EVENTS.subscribe(EventType.SERVER_TICK, onTickHandle);
     }
 
     public static synchronized TrackerHandler getInstance()
@@ -86,5 +99,31 @@ public class TrackerHandler
         return runners;
     }
 
+    private void onTick(MinecraftServer server)
+    {
+        List<ServerPlayerEntity> players = server.getPlayerManager().getPlayerList();
+        List<PlayerTracker> trackers = playerTrackerMap.values().stream().toList();
 
+        for (var player : players)
+        {
+            if (playerTrackerMap.containsKey(player.getName().getLiteralString()))
+                continue;
+
+            var playerPos = player.getBlockPos();
+            var distances = new ArrayList<Float>();
+
+            for (var tracker : trackers)
+            {
+                var currentDimension = player.getEntityWorld().getRegistryKey();
+
+                if (currentDimension == tracker.getCurrentDimension())
+                {
+                    float distance = (float)Math.sqrt(tracker.getOverworldBlock().getSquaredDistance(playerPos));
+                    distances.add(distance);
+                }
+            }
+
+            player.sendMessage(Text.of(distances.stream().map(Object::toString).collect(Collectors.joining(", "))), true);
+        }
+    }
 }
