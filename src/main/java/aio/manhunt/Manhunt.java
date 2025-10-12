@@ -1,9 +1,13 @@
 package aio.manhunt;
 
 import aio.manhunt.command.builder.CommandRegistry;
+import aio.manhunt.event.EventSystem;
+import aio.manhunt.event.EventType;
+import aio.manhunt.tracker.TrackerHandler;
 import net.fabricmc.api.ModInitializer;
 
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.server.MinecraftServer;
 import org.slf4j.Logger;
@@ -28,17 +32,29 @@ public class Manhunt implements ModInitializer
     public static final String COMMAND_PACKAGE = "aio.manhunt.command";
 	public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 
+    public static MinecraftServer SERVER;
+    public static EventSystem EVENTS;
+
 	@Override
 	public void onInitialize()
     {
-        ServerTickEvents.START_SERVER_TICK.register(this::OnServerTick);
+        EVENTS = EventSystem.getInstance();
 
+        ServerLifecycleEvents.SERVER_STARTED.register(this::onServerReady);
         CommandRegistrationCallback.EVENT.register(CommandRegistry.getInstance()::build);
+        ServerTickEvents.START_SERVER_TICK.register(this::onServerTick);
     }
 
-    private void OnServerTick(MinecraftServer minecraftServer)
+    private void onServerReady(MinecraftServer server)
     {
+        SERVER = server;
+        TrackerHandler.getInstance();
+    }
 
+
+    private void onServerTick(MinecraftServer minecraftServer)
+    {
+        EVENTS.notify(EventType.SERVER_TICK, minecraftServer);
     }
 }
 
