@@ -11,21 +11,23 @@ import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 
+import java.util.Optional;
+
 public class PlayerTracker implements IDispose
 {
-    private ServerPlayerEntity player;
+    private ServerPlayerEntity trackedPlayer;
     private String displayName;
 
-    @Getter private BlockPos overworldBlock;
-    @Getter private BlockPos netherBlock;
-    @Getter private BlockPos endBlock;
-    @Getter private RegistryKey<World> currentDimension;
+    @Getter private BlockPos lastOverworldBlock;
+    @Getter private BlockPos lastNetherBlock;
+    @Getter private BlockPos lastEndBlock;
+    @Getter private RegistryKey<World> trackedDimension;
 
     private final EventHandler<MinecraftServer> onTickHandle = this::onTick; /* needed for a stable method handle */
 
     public PlayerTracker(ServerPlayerEntity player)
     {
-        this.player = player;
+        this.trackedPlayer = player;
         this.displayName = player.getName().getLiteralString();
 
         Manhunt.EVENTS.subscribe(EventType.SERVER_TICK, onTickHandle);
@@ -36,35 +38,65 @@ public class PlayerTracker implements IDispose
         if (!isValid())
             return;
 
-        RegistryKey<World> dimensionKey = player.getEntityWorld().getRegistryKey();
-
-        BlockPos origin = player.getBlockPos();
-
-        if (dimensionKey == World.OVERWORLD) {
-            overworldBlock = origin;
-            currentDimension = World.OVERWORLD;
-        } else if (dimensionKey == World.NETHER) {
-            netherBlock = origin;
-            currentDimension = World.NETHER;
-        } else if (dimensionKey == World.END) {
-            endBlock = origin;
-            currentDimension = World.END;
-        }
-
+        updatePos();
     }
+
+    /*
+        Returns the last block tracked player was at to reach the player.
+        i.e. if the target is in the nether & the player is in the overworld, the compass will point the last overworld location
+        (which should be the nether portal)
+
+        May return 0, 0, 0 coords in instances where player goes to dimensions trackedPlayer hasn't visited.
+    */
+    public Optional<BlockPos> getBlockTowardsPlayer(ServerPlayerEntity player)
+    {
+        var playerDimension = player.getEntityWorld().getRegistryKey();
+
+        BlockPos targetPos;
+
+        if (playerDimension == World.OVERWORLD && trackedDimension != World.OVERWORLD)
+            targetPos = lastOverworldBlock;
+        else if (playerDimension == World.NETHER && trackedDimension != World.NETHER)
+            targetPos = lastNetherBlock;
+        else if (playerDimension == World.END && trackedDimension != World.END)
+            targetPos = lastEndBlock;
+        else
+            targetPos = trackedPlayer.getBlockPos();
+
+        return Optional.ofNullable(targetPos);
+    }
+
 
     private Boolean isValid()
     {
         Boolean valid = true;
 
-        if (player == null) valid = false;
-        else if (player.isRemoved()) valid = false;
-        else if (player.networkHandler == null || !player.networkHandler.isConnectionOpen()) valid = false;
+        if (trackedPlayer == null) valid = false;
+        else if (trackedPlayer.isRemoved()) valid = false;
+        else if (trackedPlayer.networkHandler == null || !trackedPlayer.networkHandler.isConnectionOpen()) valid = false;
 
         if (!valid)
-            player = Manhunt.SERVER.getPlayerManager().getPlayer(displayName);
+            trackedPlayer = Manhunt.SERVER.getPlayerManager().getPlayer(displayName);
 
-        return player != null;
+        return trackedPlayer != null;
+    }
+
+    private void updatePos()
+    {
+        RegistryKey<World> dimensionKey = trackedPlayer.getEntityWorld().getRegistryKey();
+
+        BlockPos origin = trackedPlayer.getBlockPos();
+
+        if (dimensionKey == World.OVERWORLD) {
+            lastOverworldBlock = origin;
+            trackedDimension = World.OVERWORLD;
+        } else if (dimensionKey == World.NETHER) {
+            lastNetherBlock = origin;
+            trackedDimension = World.NETHER;
+        } else if (dimensionKey == World.END) {
+            lastEndBlock = origin;
+            trackedDimension = World.END;
+        }
     }
 
     public void dispose()

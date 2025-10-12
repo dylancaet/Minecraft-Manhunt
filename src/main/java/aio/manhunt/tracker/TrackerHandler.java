@@ -12,12 +12,16 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.MathHelper;
+import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
 import org.apache.logging.log4j.core.jmx.Server;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 public class TrackerHandler
@@ -110,20 +114,93 @@ public class TrackerHandler
                 continue;
 
             var playerPos = player.getBlockPos();
-            var distances = new ArrayList<Float>();
+            var distances = new ArrayList<String>();
+            var colours = new ArrayList<String>();
 
-            for (var tracker : trackers)
-            {
-                var currentDimension = player.getEntityWorld().getRegistryKey();
+            /* TODO: NULL CHECK PLAYER */
 
-                if (currentDimension == tracker.getCurrentDimension())
-                {
-                    float distance = (float)Math.sqrt(tracker.getOverworldBlock().getSquaredDistance(playerPos));
-                    distances.add(distance);
+            for (PlayerTracker tracker : trackers) {
+                Optional<BlockPos> targetPos = tracker.getBlockTowardsPlayer(player);
+
+                if (targetPos.isEmpty()) {
+                    colours.add(Formatting.DARK_RED.toString());
+                    distances.add("N/A");
+                    continue;
                 }
+
+                float distance = (float) Math.sqrt(targetPos.get().getSquaredDistance(playerPos));
+                colours.add(getFacingColor(player, targetPos.get()));
+                distances.add(toSuperscript((int) Math.abs(Math.ceil(distance))));
             }
 
-            player.sendMessage(Text.of(distances.stream().map(Object::toString).collect(Collectors.joining(", "))), true);
+            StringBuilder renderedText = new StringBuilder();
+            for (int i = 0; i < colours.size(); i++)
+            {
+                renderedText.append(colours.get(i)).append(distances.get(i)).append("   ");
+            }
+
+            player.sendMessage(Text.of(renderedText.toString()), true);
         }
+    }
+
+    public float getYawToTarget(ServerPlayerEntity player, BlockPos target) {
+        Vec3d playerPos = player.getEntityPos();
+        double dx = target.getX() + 0.5 - playerPos.x;
+        double dz = target.getZ() + 0.5 - playerPos.z;
+        return (float) (MathHelper.wrapDegrees(Math.toDegrees(Math.atan2(-dx, dz))));
+    }
+
+    public String getFacingColor(ServerPlayerEntity player, BlockPos target) {
+        float playerYaw = MathHelper.wrapDegrees(player.getYaw());
+        float targetYaw = getYawToTarget(player, target);
+        float diff = Math.abs(MathHelper.wrapDegrees(playerYaw - targetYaw));
+
+        float facingFactor = 1.0f - (diff / 180.0f);
+
+        String colour;
+        String arrow = getArrowForAngle(diff, playerYaw, targetYaw);
+
+        if (facingFactor > 0.95f) {
+            colour = Formatting.DARK_GREEN.toString(); /* §a */
+        } else if (facingFactor > 0.35f) {
+            colour = Formatting.GOLD.toString(); /* §e */
+        } else {
+            colour = Formatting.DARK_RED.toString(); /* §c */
+        }
+
+        return colour + arrow;
+    }
+
+    private static String getArrowForAngle(double diff, float yaw, double targetAngle) {
+        double rel = MathHelper.wrapDegrees(targetAngle - yaw);
+
+        // 4-way directional breakdown
+        if (rel >= -45 && rel < 45) return "▲";
+        if (rel >= 45 && rel < 135) return "▶";
+        if (rel >= -135 && rel < -45) return "◀";
+        return "▼";
+    }
+
+
+    public static String toSuperscript(int number)
+    {
+        char[] SUPERSCRIPTS = {
+                '⁰', '¹', '²', '³', '⁴', '⁵', '⁶', '⁷', '⁸', '⁹'
+        };
+
+        String str = String.valueOf(number);
+        StringBuilder sb = new StringBuilder();
+
+        for (char c : str.toCharArray()) {
+            if (c == '-') {
+                sb.append('⁻');
+            } else if (Character.isDigit(c)) {
+                sb.append(SUPERSCRIPTS[c - '0']);
+            } else {
+                sb.append(c);
+            }
+        }
+
+        return sb.toString();
     }
 }
