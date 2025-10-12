@@ -4,7 +4,6 @@ import aio.manhunt.Manhunt;
 import aio.manhunt.event.EventHandler;
 import aio.manhunt.event.EventType;
 import lombok.Getter;
-import net.minecraft.registry.RegistryKey;
 import net.minecraft.scoreboard.AbstractTeam;
 import net.minecraft.scoreboard.Scoreboard;
 import net.minecraft.scoreboard.Team;
@@ -15,14 +14,11 @@ import net.minecraft.util.Formatting;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.World;
-import org.apache.logging.log4j.core.jmx.Server;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 public class TrackerHandler
 {
@@ -117,10 +113,9 @@ public class TrackerHandler
             var distances = new ArrayList<String>();
             var colours = new ArrayList<String>();
 
-            /* TODO: NULL CHECK PLAYER */
-
-            for (PlayerTracker tracker : trackers) {
-                Optional<BlockPos> targetPos = tracker.getBlockTowardsPlayer(player);
+            for (PlayerTracker trackedPlayer : trackers)
+            {
+                Optional<BlockPos> targetPos = trackedPlayer.getBlockTowardsPlayer(player);
 
                 if (targetPos.isEmpty()) {
                     colours.add(Formatting.DARK_RED.toString());

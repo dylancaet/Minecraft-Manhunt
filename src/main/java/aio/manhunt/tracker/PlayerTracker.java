@@ -50,20 +50,23 @@ public class PlayerTracker implements IDispose
     */
     public Optional<BlockPos> getBlockTowardsPlayer(ServerPlayerEntity player)
     {
+        Optional<BlockPos> targetPos = Optional.empty();
+
+        if (!isValid())
+            return targetPos;
+
         var playerDimension = player.getEntityWorld().getRegistryKey();
 
-        BlockPos targetPos;
-
         if (playerDimension == World.OVERWORLD && trackedDimension != World.OVERWORLD)
-            targetPos = lastOverworldBlock;
+            targetPos = Optional.ofNullable(lastOverworldBlock);
         else if (playerDimension == World.NETHER && trackedDimension != World.NETHER)
-            targetPos = lastNetherBlock;
+            targetPos = Optional.ofNullable(lastNetherBlock);
         else if (playerDimension == World.END && trackedDimension != World.END)
-            targetPos = lastEndBlock;
+            targetPos = Optional.ofNullable(lastEndBlock);
         else
-            targetPos = trackedPlayer.getBlockPos();
+            targetPos = Optional.ofNullable(trackedPlayer.getBlockPos());
 
-        return Optional.ofNullable(targetPos);
+        return targetPos;
     }
 
 
